@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: item-service
+    version: 1.0.0
+
+  # JPA / Hibernate Configuration (nếu dùng database)
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+
+  # H2 Console (cho debug)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+server:
+  port: 8082
+  servlet:
+    context-path: /
+
+  # Compression
+  compression:
+    enabled: true
+    min-response-size: 1024
+
+# Management / Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: item-service
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.example: DEBUG
+    org.springframework.web: INFO
+    org.springframework.boot: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/item-service.log
+    max-size: 10MB
+    max-history: 10
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+# Server information
+server-info:
+  name: Item Service
+  version: 1.0.0
+  description: Microservice quản lý sản phẩm (Items) trong hệ thống Demo Offloading
