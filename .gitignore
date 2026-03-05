@@ -37,8 +37,8 @@ build/
 logs/
 
 # SSL certificates (generated, not committed)
-kong/ssl/*.crt
-kong/ssl/*.key
+# kong/ssl/*.crt
+# kong/ssl/*.key
 
 # Docker
 .env
