@@ -1,0 +1,239 @@
+_format_version: "3.0"
+_transform: true
+
+# =============================================================================
+# KONG DECLARATIVE CONFIGURATION
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. SERVICES - Backend microservices that Kong proxies to
+# -----------------------------------------------------------------------------
+services:
+  - name: user-service
+    url: http://user-service:8080
+    protocol: http
+    host: user-service
+    port: 8080
+    retries: 3
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+
+    # ---------------------------------------------------------------------------
+    # 2. ROUTES - Define how requests are matched and routed to services
+    # ---------------------------------------------------------------------------
+    routes:
+      # Public routes (no authentication required)
+      - name: user-service-public
+        paths:
+          - /api/v1/auth
+        methods:
+          - POST
+        strip_path: false
+        preserve_host: true
+        tags:
+          - public
+          - auth
+
+      # Protected routes (JWT authentication required)
+      - name: user-service-protected
+        paths:
+          - /api/v1/users
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+        strip_path: false
+        preserve_host: true
+        tags:
+          - protected
+          - users
+
+      # Admin-only routes
+      - name: user-service-admin
+        paths:
+          - /api/v1/admin
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+        strip_path: false
+        preserve_host: true
+        tags:
+          - protected
+          - admin
+
+# -----------------------------------------------------------------------------
+# 3. CONSUMERS - Registered API consumers (for JWT & ACL)
+# -----------------------------------------------------------------------------
+consumers:
+  - username: admin-user
+    custom_id: admin-001
+    tags:
+      - admin
+    jwt_secrets:
+      - key: admin-issuer
+        secret: "0fnG4qhwGcijk529oNlvG3lFFgUF2dpGZY7IiOXVSlb"
+        algorithm: HS256
+    acls:
+      - group: admin-group
+      - group: user-group
+
+  - username: regular-user
+    custom_id: user-001
+    tags:
+      - user
+    jwt_secrets:
+      - key: user-issuer
+        secret: "royUGbSvQAOa39UfYdxp6XJhvKTXXrbwYW0RwJdslLf"
+        algorithm: HS256
+    acls:
+      - group: user-group
+
+# -----------------------------------------------------------------------------
+# 4. PLUGINS - Gateway Offloading: Security & Identity
+# -----------------------------------------------------------------------------
+plugins:
+  # ---------------------------------------------------------------------------
+  # 4a. GLOBAL PLUGINS - Applied to all routes
+  # ---------------------------------------------------------------------------
+
+  # Rate Limiting - Protect backend from abuse
+  - name: rate-limiting
+    config:
+      minute: 100
+      hour: 5000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+
+  # CORS - Handle Cross-Origin requests at gateway level
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - X-Auth-Token
+      credentials: true
+      max_age: 3600
+
+  # Request Size Limiting
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10
+      size_unit: megabytes
+
+  # ---------------------------------------------------------------------------
+  # 4b. JWT Authentication - Applied to protected routes
+  # ---------------------------------------------------------------------------
+  - name: jwt
+    route: user-service-protected
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      header_names:
+        - Authorization
+      run_on_preflight: true
+
+  - name: jwt
+    route: user-service-admin
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names: []
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      header_names:
+        - Authorization
+      run_on_preflight: true
+
+  # ---------------------------------------------------------------------------
+  # 4c. ACL Authorization - Role-based access control
+  # ---------------------------------------------------------------------------
+  - name: acl
+    route: user-service-protected
+    config:
+      allow:
+        - user-group
+        - admin-group
+      hide_groups_header: false
+
+  - name: acl
+    route: user-service-admin
+    config:
+      allow:
+        - admin-group
+      hide_groups_header: false
+
+  # ---------------------------------------------------------------------------
+  # 4d. Request Transformer - Forward identity headers to backend
+  #     Extracts user info from JWT and injects X-User-* headers
+  # ---------------------------------------------------------------------------
+  - name: request-transformer
+    route: user-service-protected
+    config:
+      add:
+        headers:
+          - "X-Gateway-Auth:kong-verified"
+      remove:
+        headers:
+          - Authorization
+
+  - name: request-transformer
+    route: user-service-admin
+    config:
+      add:
+        headers:
+          - "X-Gateway-Auth:kong-verified"
+      remove:
+        headers:
+          - Authorization
+
+  # ---------------------------------------------------------------------------
+  # 4e. JWT Header Injector - Extract JWT claims into X-User-* headers
+  # ---------------------------------------------------------------------------
+  - name: jwt-header-injector
+    route: user-service-protected
+
+  - name: jwt-header-injector
+    route: user-service-admin
+
+  # ---------------------------------------------------------------------------
+  # 4f. Logging - Centralized logging at gateway
+  # ---------------------------------------------------------------------------
+  - name: file-log
+    config:
+      path: /tmp/kong-requests.log
+      reopen: true
+
+  # ---------------------------------------------------------------------------
+  # 4g. Response Transformer - Clean up internal headers
+  # ---------------------------------------------------------------------------
+  - name: response-transformer
+    config:
+      remove:
+        headers:
+          - X-Gateway-Auth
+          - X-Consumer-ID
+          - X-Consumer-Custom-ID
+          - X-Consumer-Username

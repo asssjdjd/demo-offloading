@@ -31,3 +31,14 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Logs
+*.log
+logs/
+
+# SSL certificates (generated, not committed)
+kong/ssl/*.crt
+kong/ssl/*.key
+
+# Docker
+.env

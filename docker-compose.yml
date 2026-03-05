@@ -1,0 +1,111 @@
+# =============================================================================
+# Docker Compose - Gateway Offloading Pattern
+# Kong API Gateway + User Service
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Kong API Gateway (DB-less / Declarative mode)
+  # ---------------------------------------------------------------------------
+  kong:
+    build:
+      context: ./kong
+      dockerfile: Dockerfile
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_SSL_CERT: /etc/kong/ssl/server.crt
+      KONG_SSL_CERT_KEY: /etc/kong/ssl/server.key
+      KONG_LOG_LEVEL: info
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      # Custom plugin for JWT header extraction
+      KONG_PLUGINS: "bundled,jwt-header-injector"
+      KONG_LUA_PACKAGE_PATH: "/etc/kong/plugins/?.lua;/etc/kong/plugins/?/init.lua;;"
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+      - ./kong/ssl:/etc/kong/ssl:ro
+      - ./kong/plugins:/etc/kong/plugins:ro
+    ports:
+      - "8000:8000" # HTTP Proxy
+      - "8443:8443" # HTTPS Proxy (SSL Termination)
+      - "8001:8001" # Admin API
+    networks:
+      - gateway-network
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # User Service
+  # ---------------------------------------------------------------------------
+  user-service:
+    build:
+      context: ./spring-user-service
+      dockerfile: Dockerfile
+    container_name: spring-user-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/userdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SERVER_PORT: 8080
+      # Gateway trust configuration
+      GATEWAY_TRUSTED_HEADER: X-Gateway-Auth
+      GATEWAY_TRUSTED_VALUE: kong-verified
+    ports:
+      - "8080:8080"
+    networks:
+      - gateway-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MySQL Database
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_DATABASE: userdb
+      MYSQL_ROOT_PASSWORD: 123456
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - gateway-network
+    healthcheck:
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+# =============================================================================
+# Networks & Volumes
+# =============================================================================
+networks:
+  gateway-network:
+    driver: bridge
+    name: gateway-offloading-net
+
+volumes:
+  mysql-data:
+    driver: local
