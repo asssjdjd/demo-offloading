@@ -1,0 +1,25 @@
+# Group 2 - Upstream and Targets
+# Note: paste vao root level cua declarative config (cung cap voi services/routes)
+
+upstreams:
+  - name: user-service-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /actuator/health
+        timeout: 2
+        concurrency: 5
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: user-service:8080
+        weight: 100
+      # - target: user-service-2:8080
+      #   weight: 100

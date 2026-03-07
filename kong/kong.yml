@@ -5,15 +5,80 @@ _transform: true
 # KONG DECLARATIVE CONFIGURATION
 # =============================================================================
 
+# >>> GROUP2-PERF START: Upstreams with Load Balancing & Health Checks
+upstreams:
+  - name: user-service-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /actuator/health
+        timeout: 2
+        concurrency: 5
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: user-service:8080
+        weight: 100
+      # Scale by adding more targets here:
+      # - target: user-service-2:8080
+      #   weight: 100
+
+  - name: order-service-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /api/orders
+        timeout: 2
+        concurrency: 5
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: order-service:8081
+        weight: 100
+
+  - name: item-service-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /api/items
+        timeout: 2
+        concurrency: 5
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: item-service:8082
+        weight: 100
+# <<< GROUP2-PERF END
+
 # -----------------------------------------------------------------------------
 # 1. SERVICES - Backend microservices that Kong proxies to
 # -----------------------------------------------------------------------------
 services:
   - name: user-service
-    url: http://user-service:8080
+    url: http://user-service-upstream
+    # Changed from direct host to upstream for load balancing
     protocol: http
-    host: user-service
-    port: 8080
     retries: 3
     connect_timeout: 5000
     write_timeout: 60000
@@ -65,6 +130,53 @@ services:
         tags:
           - protected
           - admin
+
+  # ---------------------------------------------------------------------------
+  # Order Service (public - no JWT required for demo)
+  # ---------------------------------------------------------------------------
+  - name: order-service
+    url: http://order-service-upstream
+    protocol: http
+    retries: 3
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    routes:
+      - name: order-service-route
+        paths:
+          - /api/orders
+        methods:
+          - GET
+          - POST
+          - PATCH
+        strip_path: false
+        preserve_host: true
+        tags:
+          - orders
+
+  # ---------------------------------------------------------------------------
+  # Item Service (public - uses H2 in-memory, no auth required for demo)
+  # ---------------------------------------------------------------------------
+  - name: item-service
+    url: http://item-service-upstream
+    protocol: http
+    retries: 3
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+    routes:
+      - name: item-service-route
+        paths:
+          - /api/items
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+        strip_path: false
+        preserve_host: true
+        tags:
+          - items
 
 # -----------------------------------------------------------------------------
 # 3. CONSUMERS - Registered API consumers (for JWT & ACL)
@@ -166,6 +278,75 @@ plugins:
       header_names:
         - Authorization
       run_on_preflight: true
+
+  # >>> GROUP2-PERF START: Proxy Cache (Response Caching)
+  - name: proxy-cache
+    route: user-service-protected
+    config:
+      response_code:
+        - 200
+      request_method:
+        - GET
+      content_type:
+        - application/json
+      cache_ttl: 30
+      strategy: memory
+      vary_headers:
+        - Authorization
+
+  - name: proxy-cache
+    route: order-service-route
+    config:
+      response_code:
+        - 200
+      request_method:
+        - GET
+      content_type:
+        - application/json
+      cache_ttl: 30
+      strategy: memory
+
+  - name: proxy-cache
+    route: item-service-route
+    config:
+      response_code:
+        - 200
+      request_method:
+        - GET
+      content_type:
+        - application/json
+      cache_ttl: 30
+      strategy: memory
+  # <<< GROUP2-PERF END
+
+  # >>> GROUP2-PERF START: Circuit Breaker
+  - name: circuit-breaker
+    route: user-service-protected
+    config:
+      failure_threshold: 5
+      success_threshold: 2
+      open_timeout_ms: 30000
+      fallback_status: 503
+      fallback_body: '{"message":"Service temporarily unavailable"}'
+
+  - name: circuit-breaker
+    route: order-service-route
+    config:
+      failure_threshold: 5
+      success_threshold: 2
+      open_timeout_ms: 30000
+      fallback_status: 503
+      fallback_body: '{"message":"Service temporarily unavailable"}'
+
+  - name: circuit-breaker
+    route: item-service-route
+    config:
+      failure_threshold: 5
+      success_threshold: 2
+      open_timeout_ms: 30000
+      fallback_status: 503
+      fallback_body: '{"message":"Service temporarily unavailable"}'
+  # <<< GROUP2-PERF END
 
   # ---------------------------------------------------------------------------
   # 4c. ACL Authorization - Role-based access control

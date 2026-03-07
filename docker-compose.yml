@@ -23,8 +23,8 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ERROR_LOG: /dev/stderr
-      # Custom plugin for JWT header extraction
-      KONG_PLUGINS: "bundled,jwt-header-injector"
+      # Custom plugins: JWT header extraction + Circuit Breaker (Group 2)
+      KONG_PLUGINS: "bundled,jwt-header-injector,circuit-breaker"
       KONG_LUA_PACKAGE_PATH: "/etc/kong/plugins/?.lua;/etc/kong/plugins/?/init.lua;;"
     volumes:
       - ./kong/kong.yml:/etc/kong/kong.yml:ro
@@ -69,6 +69,52 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Order Service
+  # ---------------------------------------------------------------------------
+  order-service:
+    build:
+      context: ./spring-order-service
+      dockerfile: Dockerfile
+    container_name: spring-order-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    networks:
+      - gateway-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/orders"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Item Service
+  # ---------------------------------------------------------------------------
+  item-service:
+    build:
+      context: ./spring-item-service
+      dockerfile: Dockerfile
+    container_name: spring-item-service
+    environment:
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    networks:
+      - gateway-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/items"]
       interval: 15s
       timeout: 5s
       retries: 5

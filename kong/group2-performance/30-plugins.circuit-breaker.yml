@@ -1,0 +1,12 @@
+# Group 2 - Circuit Breaker plugin config
+# Note: custom plugin, can them vao KONG_PLUGINS de load runtime
+
+plugins:
+  - name: circuit-breaker
+    route: user-service-protected
+    config:
+      failure_threshold: 5
+      success_threshold: 2
+      open_timeout_ms: 30000
+      fallback_status: 503
+      fallback_body: '{"message":"Service temporarily unavailable"}'
