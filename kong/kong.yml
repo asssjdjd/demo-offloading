@@ -149,12 +149,13 @@ plugins:
 
   - name: tcp-log
     config:
-      host : logstash-server
-      port : 5000
-      timeout : 10000
-      keepalive : 60000
+      host: logstash
+      port: 5000
+      timeout: 10000
+      keepalive: 60000
       custom_fields_by_lua:
-        environment : "return 'production'"
+        environment: "return 'production'"
+        service: "return 'kong-gateway'"
 
   - name: zipkin
     config:

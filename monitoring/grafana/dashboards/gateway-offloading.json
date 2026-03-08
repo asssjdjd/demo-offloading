@@ -263,37 +263,7 @@
         }
       ]
     },
-    {
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "id": 8,
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
-        "tooltip": { "mode": "multi" }
-      },
-      "title": "P95 Response Time (Histogram)",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"user-service\"}[5m])) by (le))",
-          "legendFormat": "user-service p95"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"order-service\"}[5m])) by (le))",
-          "legendFormat": "order-service p95"
-        }
-      ]
-    },
+
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
@@ -393,30 +363,6 @@
         {
           "expr": "sum(rate(kong_http_requests_total{job=\"kong\"}[1m])) by (service)",
           "legendFormat": "{{service}}"
-        }
-      ]
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "lineWidth": 2, "fillOpacity": 15 },
-          "unit": "ms"
-        }
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
-      "id": 12,
-      "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
-        "tooltip": { "mode": "multi" }
-      },
-      "title": "Kong - Latency by Service",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "sum(rate(kong_latency_bucket{job=\"kong\"}[5m])) by (service, type)",
-          "legendFormat": "{{service}} - {{type}}"
         }
       ]
     }
