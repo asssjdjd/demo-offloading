@@ -16,6 +16,7 @@
       "title": "Overview",
       "type": "row"
     },
+
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
@@ -43,11 +44,12 @@
       "type": "stat",
       "targets": [
         {
-          "expr": "sum(increase(http_server_requests_seconds_count{job=\"user-service\"}[5m]))",
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"user-service\"}[5m])) or vector(0)",
           "legendFormat": "requests"
         }
       ]
     },
+
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
@@ -72,11 +74,12 @@
       "type": "stat",
       "targets": [
         {
-          "expr": "sum(increase(http_server_requests_seconds_count{job=\"order-service\"}[5m]))",
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"order-service\"}[5m])) or vector(0)",
           "legendFormat": "requests"
         }
       ]
     },
+
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
@@ -107,6 +110,7 @@
         }
       ]
     },
+
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
@@ -132,11 +136,12 @@
       "type": "stat",
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m]))",
+          "expr": "(sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or vector(0)) \n/ \n(sum(rate(http_server_requests_seconds_count[5m])) > 0)",
           "legendFormat": "error rate"
         }
       ]
     },
+
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
@@ -168,12 +173,12 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"user-service\"}[1m])) by (uri)",
-          "legendFormat": "user-service {{uri}}"
-        },
-        {
           "expr": "sum(rate(http_server_requests_seconds_count{job=\"order-service\"}[1m])) by (uri)",
           "legendFormat": "order-service {{uri}}"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"user-service\"}[1m])) by (uri)",
+          "legendFormat": "user-service {{uri}}"
         },
         {
           "expr": "sum(rate(http_server_requests_seconds_count{job=\"item-service\"}[1m])) by (uri)",
@@ -181,6 +186,7 @@
         }
       ]
     },
+
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
@@ -210,6 +216,9 @@
           "expr": "sum(rate(http_server_requests_seconds_count{job=\"order-service\"}[1m])) by (status)",
           "legendFormat": "order-svc status={{status}}"
         }
+
+
+
       ]
     },
     {

@@ -37,6 +37,9 @@ management:
   metrics:
     tags:
       application: item-service
+  distribution:
+    percentiles-histogram:
+      http.server.requests: true
 
 # Logging Configuration
 logging:
