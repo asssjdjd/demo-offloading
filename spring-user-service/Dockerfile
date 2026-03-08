@@ -1,6 +1,5 @@
 FROM eclipse-temurin:21-jre-alpine
 
-
 LABEL description="User Service - Gateway Offloading Pattern"
 
 WORKDIR /app

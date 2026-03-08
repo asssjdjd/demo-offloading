@@ -9,6 +9,7 @@ _transform: true
 # 1. SERVICES - Backend microservices that Kong proxies to
 # -----------------------------------------------------------------------------
 services:
+#  config for user service
   - name: user-service
     url: http://user-service:8080
     protocol: http
@@ -18,7 +19,6 @@ services:
     connect_timeout: 5000
     write_timeout: 60000
     read_timeout: 60000
-
     # ---------------------------------------------------------------------------
     # 2. ROUTES - Define how requests are matched and routed to services
     # ---------------------------------------------------------------------------
@@ -66,6 +66,43 @@ services:
           - protected
           - admin
 
+#    config for order service
+
+  - name : order-service
+    url : http://order-service:8081
+    protocol: http
+    host: order-service
+    port: 8081
+    retries: 3
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+
+    # ---------------------------------------------------------------------------
+    # 2. ROUTES - Define how requests are matched and routed to services
+    # ---------------------------------------------------------------------------
+    routes:
+      - name: order-service-main-routes
+        paths:
+          - /api/orders
+        methods:
+          - GET
+          - POST
+          - PATCH
+        strip_path: false
+        preserve_host: true
+        tags:
+          - protected
+          - order-service
+          - auth
+
+#    plugins:
+#      - name: file-log
+#        config:
+#          path: /opt/kong/logs/order-service.log
+#          reopen: true
+
+
 # -----------------------------------------------------------------------------
 # 3. CONSUMERS - Registered API consumers (for JWT & ACL)
 # -----------------------------------------------------------------------------
@@ -101,14 +138,33 @@ plugins:
   # 4a. GLOBAL PLUGINS - Applied to all routes
   # ---------------------------------------------------------------------------
 
-  # Rate Limiting - Protect backend from abuse
-  - name: rate-limiting
+  # some global config here
+  - name : prometheus
     config:
-      minute: 100
-      hour: 5000
-      policy: local
-      fault_tolerant: true
-      hide_client_headers: false
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+
+  - name: tcp-log
+    config:
+      host : logstash-server
+      port : 5000
+      timeout : 10000
+      keepalive : 60000
+      custom_fields_by_lua:
+        environment : "return 'production'"
+
+  - name: zipkin
+    config:
+      http_endpoint: "http://zipkin-server:9411/api/v2/spans"
+      sample_ratio: 0.1     # Production chỉ nên lấy mẫu 10% request
+      include_credential: false
+      traceid_byte_count: 16
+      header_type: b3       # Chuẩn header B3 phổ biến nhất
+
+
 
   # CORS - Handle Cross-Origin requests at gateway level
   - name: cors
@@ -221,10 +277,10 @@ plugins:
   # ---------------------------------------------------------------------------
   # 4f. Logging - Centralized logging at gateway
   # ---------------------------------------------------------------------------
-  - name: file-log
-    config:
-      path: /tmp/kong-requests.log
-      reopen: true
+#  - name: file-log
+#    config:
+#      path: /tmp/kong-requests.log
+#      reopen: true
 
   # ---------------------------------------------------------------------------
   # 4g. Response Transformer - Clean up internal headers
@@ -237,3 +293,10 @@ plugins:
           - X-Consumer-ID
           - X-Consumer-Custom-ID
           - X-Consumer-Username
+
+#  Các tính năng liên quan đến giám sát và ghi log
+#  - name : file-log
+#    config :
+#      path: /opt/kong/logs/global.log
+#      reopen : true
+
