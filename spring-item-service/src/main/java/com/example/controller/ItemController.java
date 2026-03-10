@@ -5,6 +5,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.example.gateway.GatewayHeaderExtractor;
+import com.example.gateway.GatewayIdentity;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,10 +40,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/items")
 @Tag(name = "Item Service", description = "APIs quản lý sản phẩm (Items)")
+@RequiredArgsConstructor
+@Slf4j
 public class ItemController {
 
     @Autowired
     private ItemService itemService;
+    private final GatewayHeaderExtractor headerExtractor;
 
     /**
      * Lấy danh sách tất cả sản phẩm
@@ -51,7 +59,18 @@ public class ItemController {
         @ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
         @ApiResponse(responseCode = "500", description = "Lỗi server")
     })
-    public ResponseEntity<?> getAllItems() {
+    public ResponseEntity<?> getAllItems(HttpServletRequest httpRequest) {
+
+        GatewayIdentity identity = headerExtractor.extract(httpRequest);
+
+        // 2. Kiểm tra xác thực (Authentication)
+        if (identity.getUserId() == null) {
+            log.warn("GET /api/items - Unauthorized attempt to get item");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        log.info("GET /api/items - creating get items requested by userId={}, role={}",
+                identity.getUserId(), identity.getUserRole());
+
         try {
             List<Item> items = itemService.getAllItems();
             return ResponseEntity.ok(items);
@@ -74,7 +93,21 @@ public class ItemController {
         @ApiResponse(responseCode = "400", description = "ID không hợp lệ")
     })
     public ResponseEntity<?> getItemById(
-            @PathVariable @Parameter(description = "ID của sản phẩm") Integer id) {
+            @PathVariable @Parameter(description = "ID của sản phẩm") Integer id,HttpServletRequest httpRequest
+            ) {
+
+        GatewayIdentity identity = headerExtractor.extract(httpRequest);
+
+        // 2. Kiểm tra xác thực (Authentication)
+        if (identity.getUserId() == null) {
+            log.warn("GET /api/items - Unauthorized attempt to get detail item");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // 3. Ghi log truy vết
+        log.info("GET /api/items - creating get detailed item requested by userId={}, role={}",
+                identity.getUserId(), identity.getUserRole());
+
         try {
             if (id == null || id <= 0) {
                 return ResponseEntity.badRequest()
@@ -108,7 +141,21 @@ public class ItemController {
         @ApiResponse(responseCode = "409", description = "Xung đột (SKU đã tồn tại)")
     })
     public ResponseEntity<?> createItem(
-            @RequestBody @Parameter(description = "Thông tin sản phẩm cần tạo") Item item) {
+            @RequestBody @Parameter(description = "Thông tin sản phẩm cần tạo") Item item
+            ,HttpServletRequest httpRequest) {
+
+        GatewayIdentity identity = headerExtractor.extract(httpRequest);
+
+        // 2. Kiểm tra xác thực (Authentication)
+        if (identity.getUserId() == null) {
+            log.warn("POST /api/items - Unauthorized attempt to create item");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // 3. Ghi log truy vết
+        log.info("POST /api/items - creating items requested by userId={}, role={}",
+                identity.getUserId(), identity.getUserRole());
+
         try {
             Item createdItem = itemService.createItem(item);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdItem);
@@ -137,7 +184,19 @@ public class ItemController {
     })
     public ResponseEntity<?> updateItem(
             @PathVariable @Parameter(description = "ID của sản phẩm") Integer id,
-            @RequestBody @Parameter(description = "Thông tin cần cập nhật") Item itemDetails) {
+            @RequestBody @Parameter(description = "Thông tin cần cập nhật") Item itemDetails,HttpServletRequest httpRequest) {
+
+        GatewayIdentity identity = headerExtractor.extract(httpRequest);
+
+        // 2. Kiểm tra xác thực (Authentication)
+        if (identity.getUserId() == null) {
+            log.warn("POST /api/orders - Unauthorized attempt to create order");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // 3. Ghi log truy vết
+        log.info("POST /api/orders - creating order requested by userId={}, role={}",
+                identity.getUserId(), identity.getUserRole());
         try {
             Optional<Item> updatedItem = itemService.updateItem(id, itemDetails);
             if (updatedItem.isPresent()) {
@@ -170,7 +229,19 @@ public class ItemController {
         @ApiResponse(responseCode = "400", description = "ID không hợp lệ")
     })
     public ResponseEntity<?> deleteItem(
-            @PathVariable @Parameter(description = "ID của sản phẩm") Integer id) {
+            @PathVariable @Parameter(description = "ID của sản phẩm") Integer id,HttpServletRequest httpRequest) {
+        GatewayIdentity identity = headerExtractor.extract(httpRequest);
+
+        // 2. Kiểm tra xác thực (Authentication)
+        if (identity.getUserId() == null) {
+            log.warn("POST /api/orders - Unauthorized attempt to create order");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // 3. Ghi log truy vết
+        log.info("POST /api/orders - creating order requested by userId={}, role={}",
+                identity.getUserId(), identity.getUserRole());
+
         try {
             boolean deleted = itemService.deleteItem(id);
             if (deleted) {

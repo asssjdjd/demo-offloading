@@ -65,6 +65,11 @@ services:
         tags:
           - protected
           - admin
+    plugins:
+      - name: file-log
+        config:
+          path: /opt/kong/logs/user-service.log
+          reopen: true
 
 #    config for order service
 
@@ -96,11 +101,36 @@ services:
           - order-service
           - auth
 
-#    plugins:
-#      - name: file-log
-#        config:
-#          path: /opt/kong/logs/order-service.log
-#          reopen: true
+  - name : item-service
+    url : http://item-service:8082
+    protocol: http
+    host: item-service
+    port: 8082
+    retries: 3
+    connect_timeout: 5000
+    write_timeout: 60000
+    read_timeout: 60000
+
+    routes:
+      - name: item-service-routes
+        paths:
+          - /api/items
+        methods:
+          - GET
+          - POST
+          - PATCH
+          - PUT
+        strip_path: false
+        preserve_host: true
+        tags:
+          - protected
+          - order-service
+          - auth
+    plugins:
+      - name: file-log
+        config:
+          path: /opt/kong/logs/item-service.log
+          reopen: true
 
 
 # -----------------------------------------------------------------------------
@@ -146,7 +176,6 @@ plugins:
       bandwidth_metrics: true
       upstream_health_metrics: true
 
-
   - name: tcp-log
     config:
       host: logstash
@@ -160,12 +189,17 @@ plugins:
   - name: zipkin
     config:
       http_endpoint: "http://zipkin-server:9411/api/v2/spans"
-      sample_ratio: 0.1     # Production chỉ nên lấy mẫu 10% request
+      sample_ratio: 0.1     
       include_credential: false
       traceid_byte_count: 16
       header_type: b3       # Chuẩn header B3 phổ biến nhất
 
-
+  - name : rate-limiting
+    config:
+      minute : 7
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
 
   # CORS - Handle Cross-Origin requests at gateway level
   - name: cors
@@ -224,6 +258,33 @@ plugins:
         - Authorization
       run_on_preflight: true
 
+#  config authentication and authorization for order-service and item-service
+  - name : jwt
+    route : order-service-main-routes
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names: [ ]
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      header_names:
+        - Authorization
+      run_on_preflight: true
+
+  - name: jwt
+    route: item-service-routes
+    config:
+      uri_param_names:
+        - jwt
+      cookie_names: [ ]
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+      header_names:
+        - Authorization
+      run_on_preflight: true
+
   # ---------------------------------------------------------------------------
   # 4c. ACL Authorization - Role-based access control
   # ---------------------------------------------------------------------------
@@ -239,6 +300,22 @@ plugins:
     route: user-service-admin
     config:
       allow:
+        - admin-group
+      hide_groups_header: false
+
+  - name: acl
+    route: order-service-main-routes
+    config:
+      allow:
+        - user-group
+        - admin-group
+      hide_groups_header: false
+
+  - name: acl
+    route: item-service-routes
+    config:
+      allow:
+        - user-group
         - admin-group
       hide_groups_header: false
 
@@ -266,6 +343,26 @@ plugins:
         headers:
           - Authorization
 
+  - name: request-transformer
+    route: order-service-main-routes
+    config:
+      add:
+        headers:
+          - "X-Gateway-Auth:kong-verified"
+      remove:
+        headers:
+          - Authorization
+
+  - name: request-transformer
+    route: item-service-routes
+    config:
+      add:
+        headers:
+          - "X-Gateway-Auth:kong-verified"
+      remove:
+        headers:
+          - Authorization
+
   # ---------------------------------------------------------------------------
   # 4e. JWT Header Injector - Extract JWT claims into X-User-* headers
   # ---------------------------------------------------------------------------
@@ -275,13 +372,11 @@ plugins:
   - name: jwt-header-injector
     route: user-service-admin
 
-  # ---------------------------------------------------------------------------
-  # 4f. Logging - Centralized logging at gateway
-  # ---------------------------------------------------------------------------
-#  - name: file-log
-#    config:
-#      path: /tmp/kong-requests.log
-#      reopen: true
+  - name: jwt-header-injector
+    route: order-service-main-routes
+
+  - name: jwt-header-injector
+    route: item-service-routes
 
   # ---------------------------------------------------------------------------
   # 4g. Response Transformer - Clean up internal headers

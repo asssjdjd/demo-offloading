@@ -151,6 +151,28 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # Item Service
+  # ---------------------------------------------------------------------------
+  item-service:
+    build:
+      context: .
+      dockerfile: ./spring-item-service/Dockerfile
+    container_name: spring-item-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    networks:
+      - gateway-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Prometheus - Metrics Collection
   # ---------------------------------------------------------------------------
   prometheus:
